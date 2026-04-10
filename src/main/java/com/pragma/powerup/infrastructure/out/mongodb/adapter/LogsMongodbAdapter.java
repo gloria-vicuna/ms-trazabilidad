@@ -2,11 +2,13 @@ package com.pragma.powerup.infrastructure.out.mongodb.adapter;
 
 import com.pragma.powerup.domain.model.LogModel;
 import com.pragma.powerup.domain.spi.ILogPersistencePort;
+import com.pragma.powerup.infrastructure.out.mongodb.entity.LogEntity;
 import com.pragma.powerup.infrastructure.out.mongodb.mapper.ILogEntityMapper;
 import com.pragma.powerup.infrastructure.out.mongodb.repository.ILogsOrdersRepository;
 import lombok.RequiredArgsConstructor;
 
 import java.util.List;
+import java.util.Optional;
 
 @RequiredArgsConstructor
 public class LogsMongodbAdapter implements ILogPersistencePort {
@@ -16,25 +18,21 @@ public class LogsMongodbAdapter implements ILogPersistencePort {
 
     @Override
     public void saveLog(LogModel logModel) {
-        logsRepository.findByIdOrder(logModel.getIdOrder()).ifPresentOrElse(
-                logEntity -> {
-                    if (logModel.getPending() != null) logEntity.setPending(logModel.getPending());
-                    if (logModel.getInPreparation() != null) logEntity.setInPreparation(logModel.getInPreparation());
-                    if (logModel.getReady() != null) logEntity.setReady(logModel.getReady());
-                    if (logModel.getDelivered() != null) logEntity.setDelivered(logModel.getDelivered());
-                    if (logModel.getEmployeeId() != null) logEntity.setEmployeeId(logModel.getEmployeeId());
+        LogEntity entity = logsRepository.findByIdOrder(logModel.getIdOrder())
+                .map(existing -> updateFields(existing, logModel))
+                .orElseGet(() -> logEntityMapper.toDocument(logModel));
 
-                    logsRepository.save(logEntity);
-                },
-                () -> logsRepository.save(logEntityMapper.toDocument(logModel))
-        );
+        logsRepository.save(entity);
     }
 
-    @Override
-    public LogModel getLogByOrder(Long idOrder) {
-        return logsRepository.findByIdOrder(idOrder)
-                .map(logEntityMapper::toLogOrder)
-                .orElse(null);
+    private LogEntity updateFields(LogEntity existing, LogModel updates) {
+
+        Optional.ofNullable(updates.getPending()).ifPresent(existing::setPending);
+        Optional.ofNullable(updates.getInPreparation()).ifPresent(existing::setInPreparation);
+        Optional.ofNullable(updates.getReady()).ifPresent(existing::setReady);
+        Optional.ofNullable(updates.getDelivered()).ifPresent(existing::setDelivered);
+        Optional.ofNullable(updates.getEmployeeId()).ifPresent(existing::setEmployeeId);
+        return existing;
     }
 
     @Override
@@ -43,15 +41,9 @@ public class LogsMongodbAdapter implements ILogPersistencePort {
     }
 
     @Override
-    public void updateLog(LogModel logModel) {
-        logsRepository.findByIdOrder(logModel.getIdOrder()).ifPresent(logEntity -> {
-            if (logModel.getPending() != null) logEntity.setPending(logModel.getPending());
-            if (logModel.getInPreparation() != null) logEntity.setInPreparation(logModel.getInPreparation());
-            if (logModel.getReady() != null) logEntity.setReady(logModel.getReady());
-            if (logModel.getDelivered() != null) logEntity.setDelivered(logModel.getDelivered());
-            if (logModel.getEmployeeId() != null) logEntity.setEmployeeId(logModel.getEmployeeId());
-
-            logsRepository.save(logEntity);
-        });
+    public LogModel getLogByOrder(Long idOrder) {
+        return logsRepository.findByIdOrder(idOrder)
+                .map(logEntityMapper::toLogOrder)
+                .orElse(null);
     }
 }

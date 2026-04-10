@@ -6,9 +6,6 @@ import com.pragma.powerup.application.dto.response.LogsResponseDto;
 import com.pragma.powerup.application.handler.ILogsHandler;
 import com.pragma.powerup.application.mapper.LogDtoMapper;
 import com.pragma.powerup.domain.api.ILogServicePort;
-import com.pragma.powerup.domain.exception.NotOwnerOfOrderException;
-import com.pragma.powerup.domain.exception.OnlyClientCanCreateLogException;
-import com.pragma.powerup.domain.exception.OnlyEmployeeCanUpdateLogException;
 import com.pragma.powerup.domain.model.LogModel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -27,56 +24,29 @@ public class LogsHandler implements ILogsHandler {
 
     @Override
     public void saveLog(LogsRequestDto logDto) {
-
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String role = auth.getAuthorities().iterator().next().getAuthority();
+        Long userId = Long.parseLong(auth.getName());
 
-        Long userIdFromToken = Long.parseLong(auth.getName());
+        LogModel model = logDtoMapper.toLog(logDto);
 
-        if (logDto.getPending() != null && !role.equals("ROLE_CLIENT")) {
-            throw new OnlyClientCanCreateLogException();
-        }
 
-        if ((logDto.getInPreparation() != null || logDto.getReady() != null || logDto.getDelivered() != null)
-                && !role.equals("ROLE_EMPLOYEE")) {
-            throw new OnlyEmployeeCanUpdateLogException();
-        }
+        if (role.equals("ROLE_CLIENT")) model.setClientId(userId);
+        if (role.equals("ROLE_EMPLOYEE")) model.setEmployeeId(userId);
 
-        if (role.equals("ROLE_CLIENT")) {
-            logDto.setClientId(userIdFromToken);
-        }
-
-        if (role.equals("ROLE_EMPLOYEE")) {
-            logDto.setEmployeeId(userIdFromToken);
-        }
-
-        logServicePort.saveLog(logDtoMapper.toLog(logDto));
+        logServicePort.saveLog(model, role);
     }
 
     @Override
     public LogsResponseDto getOrderTraceability(Long idOrder) {
         LogModel logModel = logServicePort.getOrderTraceability(idOrder);
-
-        Long clientIdFromToken = Long.parseLong(SecurityContextHolder.getContext().getAuthentication().getName());
-        if (!logModel.getClientId().equals(clientIdFromToken)) {
-            throw new NotOwnerOfOrderException();
-        }
-
-        LogsResponseDto response = new LogsResponseDto();
-        response.setIdOrder(idOrder);
-        response.setHistory(logDtoMapper.toResponseList(logModel));
-
-        return response;
+        return new LogsResponseDto(idOrder, logDtoMapper.toResponseList(logModel));
     }
 
     @Override
     public List<RankingResponseDto> getRanking() {
-        List<LogModel> rankingModels = logServicePort.getRanking();
-
-        return rankingModels.stream()
-                .map(model -> new RankingResponseDto(
-                        model.getEmployeeId(),
-                        model.getAverageTime()))
+        return logServicePort.getRanking().stream()
+                .map(m -> new RankingResponseDto(m.getEmployeeId(), m.getAverageTime()))
                 .collect(Collectors.toList());
     }
 }
