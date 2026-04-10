@@ -34,15 +34,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String token = extractToken(request);
-        System.out.println(">>> Intentando acceder a: " + request.getRequestURI());
-        System.out.println(">>> Token encontrado: " + (token != null));
 
         if (token != null && jwtTokenProvider.validateToken(token)
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
 
             String  userId = jwtTokenProvider.getUserId(token);
             String role = jwtTokenProvider.getRole(token);
-            System.out.println(">>> Rol en token: " + role);
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(
                             userId,

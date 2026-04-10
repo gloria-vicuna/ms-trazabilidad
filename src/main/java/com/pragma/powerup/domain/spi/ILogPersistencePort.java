@@ -10,8 +10,6 @@ public interface ILogPersistencePort {
 
     LogModel getLogByOrder(Long idOrder);
 
-    void updateLog(LogModel logModel);
-
     List<LogModel> findAllLogs();
 
 }
